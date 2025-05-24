@@ -17,6 +17,16 @@ public class Kiosk {
         beverages.add(beverage);
     }
 
+    public void add(Beverage beverage, int count) {
+        if (count <= 0) {
+            throw new IllegalArgumentException("음료는 한잔 이상 주문해야 합니다.");
+        }
+
+        for(int i=0; i<count; i++) {
+            beverages.add(beverage);
+        }
+    }
+
     public void remove(Beverage beverage) {
         beverages.remove(beverage);
     }

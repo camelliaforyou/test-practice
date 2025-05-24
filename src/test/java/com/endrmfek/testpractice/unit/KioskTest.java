@@ -7,6 +7,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 
 class KioskTest {
@@ -28,6 +29,30 @@ class KioskTest {
         //assertThat(kiosk.getBeverages().size()).isEqualTo(1);
         assertThat(kiosk.getBeverages()).hasSize(1);
         assertThat(kiosk.getBeverages().get(0).getName()).isEqualTo("아메리카노");
+    }
+
+    @Test
+    void addSeveralBeverages() {
+        Kiosk kiosk = new Kiosk();
+        Americano americano = new Americano();
+
+        kiosk.add(americano, 2);
+
+        //assertThat(kiosk.getBeverages().size()).isEqualTo(1);
+        assertThat(kiosk.getBeverages().get(0)).isEqualTo(americano);
+        assertThat(kiosk.getBeverages().get(1)).isEqualTo(americano);
+    }
+    @Test
+    void addZeroBeverage() {
+        Kiosk kiosk = new Kiosk();
+        Americano americano = new Americano();
+
+        kiosk.add(americano, 0);
+
+        assertThatThrownBy(() -> kiosk.add(americano, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("음료는 한잔 이상 주문해야 합니다.");
+
     }
 
     @Test
