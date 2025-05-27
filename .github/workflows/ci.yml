@@ -1,0 +1,28 @@
+name: CI - Spring Boot          # 워크플로우 이름 (GitHub Actions에서 보일 이름)
+
+on:                              # 트리거 (언제 실행할 것인가?)
+  push:                          # 'push' 이벤트 발생 시 실행
+    branches: [ "main" ]         # 특히 main 브랜치에 push될 때만
+
+jobs:                            # 여러 job을 동시에 실행 가능
+  build:                         # job 이름 (원하는 이름으로 바꿔도 됨)
+    runs-on: ubuntu-latest       # 어떤 OS 환경에서 실행할지 (우분투 최신 버전)
+
+    steps:                       # job 안에서의 실행 단위(step)
+      - name: 📦 코드 체크아웃
+        uses: actions/checkout@v3   # GitHub repo 코드를 받아오는 액션
+
+      - name: ☕ Java 17 세팅
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'        # 사용할 Java 버전
+          distribution: 'temurin'   # OpenJDK 배포판 선택 (temurin이 가장 일반적)
+
+      - name: ✅ gradlew 실행 권한 부여
+        run: chmod +x ./gradlew     # gradlew에 실행 권한 주기 (유닉스 환경에서 필수)
+
+      - name: 🧪 테스트 실행
+        run: ./gradlew test         # 단위 테스트 실행
+
+      - name: 🏗️ 빌드 실행
+        run: ./gradlew build        # 애플리케이션 빌드 (jar 생성)
