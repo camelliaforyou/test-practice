@@ -50,10 +50,17 @@ jobs:
           script: |
             bash -c '
               echo "[1] 기존 애플리케이션 종료 시도"
-              pkill -f "java -jar" || true
+              PID=$(pgrep -f "java -jar" || true)
+              if [ -n "$PID" ]; then
+                echo "→ 종료할 프로세스 ID: $PID"
+                kill -9 "$PID"
+              else
+                echo "→ 종료할 프로세스가 없습니다."
+              fi
 
               echo "[2] JAR 파일 선택"
               JAR=$(ls /home/ubuntu/app/*.jar | head -n 1)
+              echo "→ 선택된 JAR: $JAR"
               if [ ! -f "$JAR" ]; then
                 echo "❌ JAR 파일이 존재하지 않습니다: $JAR"
                 exit 1
@@ -62,17 +69,19 @@ jobs:
               echo "[3] JAR 실행"
               nohup java -jar "$JAR" > /home/ubuntu/app/app.log 2>&1 & disown
 
-              echo "[4] 앱 기동 대기..."
+              echo "[4] 앱 기동 대기 (10초)"
               sleep 10
 
               echo "[5] 애플리케이션 상태 확인"
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/)
+              echo "→ HTTP 상태 코드: $STATUS"
               if [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || [ "$STATUS" = "401" ]; then
                 echo "✅ 애플리케이션이 정상적으로 실행되었습니다. 응답 코드: $STATUS"
                 exit 0
               else
                 echo "❌ 애플리케이션 응답이 없습니다. 응답 코드: $STATUS"
-                tail -n 50 /home/ubuntu/app/app.log || true
+                tail -n 50 /home/ubuntu/app/app.log || echo "(app.log 없음)"
                 exit 1
               fi
             '
+          
