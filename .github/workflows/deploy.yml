@@ -1,5 +1,3 @@
-# GitHub Actions 워크플로우: main 브랜치에 push되면 EC2에 자동 배포
-
 name: Deploy to EC2
 
 on:
@@ -11,73 +9,57 @@ on:
 jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest   # GitHub에서 제공하는 우분투 가상머신에서 실행
+    runs-on: ubuntu-latest
 
     steps:
-      # 1. GitHub 리포지토리의 코드를 체크아웃
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      # 2. Java 17 설치 (Spring Boot 빌드를 위해 필요)
-      - name: Set up JDK
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: gradlew 실행 권한 부여
-        run: chmod +x ./gradlew
-
-      # 3. Gradle로 프로젝트 빌드
-      - name: Build project
-        run: ./gradlew clean build
-
-      # 4. 빌드된 JAR 파일을 EC2로 복사 (SCP 방식 사용)
       - name: Copy JAR to EC2
         uses: appleboy/scp-action@master
         with:
-          host: ${{ secrets.EC2_HOST }}          # EC2 인스턴스의 IP 주소
-          username: ${{ secrets.EC2_USER }}      # SSH 사용자명 (예: ubuntu)
-          key: ${{ secrets.EC2_KEY }}            # 개인 SSH 키 (GitHub Secret에 등록)
-          source: "build/libs/*.jar"             # 전송할 파일 경로 (빌드된 JAR)
-          target: "/home/ubuntu/app"             # EC2에서의 저장 위치
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "build/libs/*.jar"
+          target: "/home/ubuntu/app"
 
-      # 5. EC2에 SSH 접속하여 Spring Boot 앱 재시작
-      - name: Restart app on EC2
+      - name: Stop existing app
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            bash -c '
-              echo "[1] 기존 애플리케이션 종료 시도"
-              pgrep -f "java -jar" | xargs -r kill -9 || echo "→ 종료할 프로세스 없음"
+            echo "[1] 기존 애플리케이션 종료 시도"
+            pkill -f "java -jar" || echo "→ 종료할 프로세스 없음"
 
-              echo "[2] JAR 파일 선택"
-              JAR=$(ls /home/ubuntu/app/*.jar 2>/dev/null | head -n 1)
-              echo "→ 선택된 JAR: $JAR"
-              if [ ! -f "$JAR" ]; then
-                echo "❌ JAR 파일이 존재하지 않습니다: $JAR"
-                exit 1
-              fi
+      - name: Start new app and health check
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "[2] JAR 파일 선택"
+            JAR=$(ls /home/ubuntu/app/*.jar | head -n 1)
+            if [ ! -f "$JAR" ]; then
+              echo "❌ JAR 파일이 없습니다: $JAR"
+              exit 1
+            fi
 
-              echo "[3] JAR 실행"
-              nohup java -jar "$JAR" > /home/ubuntu/app/app.log 2>&1 & disown
+            echo "[3] 애플리케이션 실행"
+            nohup java -jar "$JAR" > /home/ubuntu/app/app.log 2>&1 &
+            disown
 
-              echo "[4] 앱 기동 대기 (10초)"
-              sleep 10
+            echo "[4] 기동 대기"
+            sleep 10
 
-              echo "[5] 애플리케이션 상태 확인"
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/)
-              echo "→ HTTP 상태 코드: $STATUS"
-              if [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || [ "$STATUS" = "401" ]; then
-                echo "✅ 애플리케이션이 정상적으로 실행되었습니다. 응답 코드: $STATUS"
-                exit 0
-              else
-                echo "❌ 애플리케이션 응답이 없습니다. 응답 코드: $STATUS"
-                tail -n 50 /home/ubuntu/app/app.log || echo "(app.log 없음)"
-                exit 1
-              fi
-            '
-          
+            echo "[5] 상태 확인"
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/)
+            echo "→ 응답 코드: $STATUS"
+
+            if [[ "$STATUS" == "200" || "$STATUS" == "302" || "$STATUS" == "401" ]]; then
+              echo "✅ 애플리케이션이 정상적으로 실행되었습니다."
+            else
+              echo "❌ 앱 응답 없음, 로그 출력:"
+              tail -n 50 /home/ubuntu/app/app.log || echo "(로그 없음)"
+              exit 1
+            fi
