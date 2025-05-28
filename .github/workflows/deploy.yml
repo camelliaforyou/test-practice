@@ -6,7 +6,7 @@ on:
     types:
       - completed
 
-permissions:   # ✅ 꼭 있어야 함!
+permissions:
   actions: read
   contents: read
 
@@ -16,13 +16,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: spring-boot-app
-          path: ./spring-boot-app
+      - name: 🔧 gh 설치 (for retry)
+        uses: cli/cli-action@v1
 
-      - name: Copy JAR to EC2
+      - name: 🔄 빌드 아티팩트 다운로드 (최대 5회 재시도)
+        run: |
+          for i in {1..5}; do
+            echo "🔄 다운로드 시도 $i ..."
+            gh run download ${{ github.event.workflow_run.id }} -n spring-boot-app -D ./spring-boot-app && break
+            echo "⏳ 잠시 대기 후 재시도..."
+            sleep 5
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📦 EC2로 JAR 복사
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -31,7 +39,7 @@ jobs:
           source: "spring-boot-app/*.jar"
           target: "/home/ubuntu/app"
 
-      - name: Stop existing app
+      - name: ⛔ 기존 앱 종료
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -41,7 +49,7 @@ jobs:
             echo "[1] 기존 애플리케이션 종료 시도"
             pkill -f "java -jar" || echo "→ 종료할 프로세스 없음"
 
-      - name: Start new app and health check
+      - name: 🚀 새 앱 실행 + 헬스체크
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
