@@ -48,6 +48,5 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            pkill -f 'java -jar' || true          # 기존에 실행 중인 애플리케이션 종료
-            nohup java -jar /home/ubuntu/app/*.jar > /home/ubuntu/app/app.log 2>&1 &
-                                                 # 새 JAR 파일로 앱 백그라운드 실행 (로그 저장)
+            pkill -f 'java -jar' || true
+            nohup java -jar /home/ubuntu/app/*.jar > /home/ubuntu/app/app.log 2>&1 & disown
