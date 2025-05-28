@@ -1,0 +1,50 @@
+# GitHub Actions 워크플로우: main 브랜치에 push되면 EC2에 자동 배포
+
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main    # main 브랜치에 push 될 때마다 실행
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest   # GitHub에서 제공하는 우분투 가상머신에서 실행
+
+    steps:
+      # 1. GitHub 리포지토리의 코드를 체크아웃
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Java 17 설치 (Spring Boot 빌드를 위해 필요)
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # 3. Gradle로 프로젝트 빌드
+      - name: Build project
+        run: ./gradlew clean build
+
+      # 4. 빌드된 JAR 파일을 EC2로 복사 (SCP 방식 사용)
+      - name: Copy JAR to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}          # EC2 인스턴스의 IP 주소
+          username: ${{ secrets.EC2_USER }}      # SSH 사용자명 (예: ubuntu)
+          key: ${{ secrets.EC2_KEY }}            # 개인 SSH 키 (GitHub Secret에 등록)
+          source: "build/libs/*.jar"             # 전송할 파일 경로 (빌드된 JAR)
+          target: "/home/ubuntu/app"             # EC2에서의 저장 위치
+
+      # 5. EC2에 SSH 접속하여 Spring Boot 앱 재시작
+      - name: Restart app on EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            pkill -f 'java -jar' || true          # 기존에 실행 중인 애플리케이션 종료
+            nohup java -jar /home/ubuntu/app/*.jar > /home/ubuntu/app/app.log 2>&1 &
+                                                 # 새 JAR 파일로 앱 백그라운드 실행 (로그 저장)
