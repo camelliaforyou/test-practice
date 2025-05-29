@@ -40,6 +40,17 @@ jobs:
           source: "build/libs/*.jar"
           target: "/home/ubuntu/app"
 
+      - name: 🛑 기존 애플리케이션 종료
+        uses: appleboy/ssh-action@master
+        continue-on-error: true # 실패해도 넘어가도록 설정
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "[1] 기존 애플리케이션 종료 시도"
+            pkill -f "java -jar" && echo "→ 프로세스 종료 완료" || echo "→ 종료할 프로세스 없음"
+
       - name: Start new app and health check
         uses: appleboy/ssh-action@master
         with:
@@ -49,14 +60,6 @@ jobs:
           script: |
             bash -c '
             set +e
-
-            echo "[1] 기존 애플리케이션 종료 시도"
-            pkill -f "java -jar"
-            if [ $? -eq 0 ]; then
-              echo "→ 프로세스 종료 완료"
-            else
-              echo "→ 종료할 프로세스 없음"
-            fi
 
             echo "[2] JAR 파일 선택"
             JAR=$(ls /home/ubuntu/app/*.jar | head -n 1)
