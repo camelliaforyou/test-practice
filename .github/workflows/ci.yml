@@ -1,34 +1,76 @@
-name: CI - Spring Boot          # 워크플로우 이름 (GitHub Actions에서 보일 이름)
+name: CI/CD - Spring Boot to EC2
 
-on:                              # 트리거 (언제 실행할 것인가?)
-  push:                          # 'push' 이벤트 발생 시 실행
-    branches: [ "main" ]         # 특히 main 브랜치에 push될 때만
+on:
+  push:
+    branches: ["main"]
 
-jobs:                            # 여러 job을 동시에 실행 가능
-  build:                         # job 이름 (원하는 이름으로 바꿔도 됨)
-    runs-on: ubuntu-latest       # 어떤 OS 환경에서 실행할지 (우분투 최신 버전)
+permissions:
+  contents: read
+  actions: read
 
-    steps:                       # job 안에서의 실행 단위(step)
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
       - name: 📦 코드 체크아웃
-        uses: actions/checkout@v3   # GitHub repo 코드를 받아오는 액션
+        uses: actions/checkout@v3
 
       - name: ☕ Java 17 세팅
         uses: actions/setup-java@v3
         with:
-          java-version: '17'        # 사용할 Java 버전
-          distribution: 'temurin'   # OpenJDK 배포판 선택 (temurin이 가장 일반적)
+          java-version: '17'
+          distribution: 'temurin'
 
       - name: ✅ gradlew 실행 권한 부여
-        run: chmod +x ./gradlew     # gradlew에 실행 권한 주기 (유닉스 환경에서 필수)
+        run: chmod +x ./gradlew
 
       - name: 🧪 테스트 실행
-        run: ./gradlew test         # 단위 테스트 실행
+        run: ./gradlew test
 
       - name: 🏗️ 빌드 실행
-        run: ./gradlew build        # 애플리케이션 빌드 (jar 생성)
+        run: ./gradlew build
 
-      - name: 📤 JAR 파일 업로드
-        uses: actions/upload-artifact@v4
+      - name: 📤 JAR 파일 복사
+        uses: appleboy/scp-action@master
         with:
-          name: spring-boot-app
-          path: build/libs/*.jar
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "build/libs/*.jar"
+          target: "/home/ubuntu/app"
+
+      - name: 🚀 앱 재시작 및 헬스체크
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "[1] 기존 애플리케이션 종료 시도"
+            pkill -f "java -jar" || echo "→ 종료할 프로세스 없음"
+
+            echo "[2] JAR 파일 선택"
+            JAR=$(ls /home/ubuntu/app/*.jar | head -n 1)
+            if [ ! -f "$JAR" ]; then
+              echo "❌ JAR 파일이 없습니다: $JAR"
+              exit 1
+            fi
+
+            echo "[3] 애플리케이션 실행"
+            nohup java -jar "$JAR" > /home/ubuntu/app/app.log 2>&1 & disown
+
+            echo "[4] 기동 대기"
+            sleep 10
+
+            echo "[5] 상태 확인"
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/)
+            echo "→ 응답 코드: $STATUS"
+
+            if [[ "$STATUS" == "200" || "$STATUS" == "302" || "$STATUS" == "401" ]]; then
+              echo "✅ 애플리케이션이 정상적으로 실행되었습니다."
+            else
+              echo "❌ 앱 응답 없음, 로그 출력:"
+              tail -n 50 /home/ubuntu/app/app.log || echo "(로그 없음)"
+              exit 1
+            fi
