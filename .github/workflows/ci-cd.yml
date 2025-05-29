@@ -59,7 +59,7 @@ jobs:
               fi
             '
 
-      - name: Start new app and health check
+      - name: 🚀 앱 재시작 및 헬스체크
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
