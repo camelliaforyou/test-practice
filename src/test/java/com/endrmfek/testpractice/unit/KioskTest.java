@@ -50,12 +50,9 @@ class KioskTest {
         Kiosk kiosk = new Kiosk();
         Americano americano = new Americano();
 
-        kiosk.add(americano, 0);
-
         assertThatThrownBy(() -> kiosk.add(americano, 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("음료는 한잔 이상 주문해야 합니다.");
-
     }
 
     @Test
