@@ -2,9 +2,12 @@ package com.endrmfek.testpractice.unit;
 
 import com.endrmfek.testpractice.unit.beverage.Americano;
 import com.endrmfek.testpractice.unit.beverage.Latte;
+import com.endrmfek.testpractice.unit.order.Order;
 import net.bytebuddy.description.type.RecordComponentDescription;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -81,5 +84,26 @@ class KioskTest {
         kiosk.clear();
         assertThat(kiosk.getBeverages()).isEmpty();
     }
+
+    @Test
+    void createOrder() {
+        Kiosk kiosk = new Kiosk();
+        Americano americano = new Americano();
+
+        kiosk.add(americano);
+
+        Order order = kiosk.createOrder();
+
+        assertThat(kiosk.getBeverages()).hasSize(1);
+        assertThat(kiosk.getBeverages().get(0).getName()).isEqualTo("아메리카노");
+    }
+
+     
+
+
+
+
+
+
 
 }

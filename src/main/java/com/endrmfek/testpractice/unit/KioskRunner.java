@@ -2,6 +2,9 @@ package com.endrmfek.testpractice.unit;
 
 import com.endrmfek.testpractice.unit.beverage.Americano;
 import com.endrmfek.testpractice.unit.beverage.Latte;
+import com.endrmfek.testpractice.unit.order.Order;
+
+import java.time.LocalDateTime;
 
 public class KioskRunner {
     public static void main(String[] args) {
@@ -13,5 +16,7 @@ public class KioskRunner {
 
         int totalPrice = kiosk.calculateTotalPrice();
         System.out.println(">> 총 주문 가격 : " + totalPrice);
+
+        Order order = kiosk.createOrder(LocalDateTime.now());
     }
 }
