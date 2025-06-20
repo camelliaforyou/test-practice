@@ -83,6 +83,19 @@ class KioskTest {
     }
 
     @Test
+    void calculateTotalPrice() {
+        Kiosk kiosk = new Kiosk();
+        Americano americano = new Americano();
+        Latte latte = new Latte();
+        kiosk.add(americano);
+        kiosk.add(latte);
+
+        int totalPrice = kiosk.calculateTotalPrice();
+
+        assertThat(totalPrice).isEqualTo(8500);
+    }
+
+    @Test
     void createOrder() {
         Kiosk kiosk = new Kiosk();
         Americano americano = new Americano();
